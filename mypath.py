@@ -3,10 +3,10 @@ class Path(object):
     def db_dir(database):
         if database == 'ucf101':
             # folder that contains class labels
-            root_dir = '/Path/to/UCF-101'
+            root_dir = '/data/unagi0/dataset/UCF101/mp4'
 
             # Save preprocess data into output_dir
-            output_dir = '/path/to/VAR/ucf101'
+            output_dir = '/data/unagi0/kamata/ucf101'
 
             return root_dir, output_dir
         elif database == 'hmdb51':
@@ -22,4 +22,4 @@ class Path(object):
 
     @staticmethod
     def model_dir():
-        return '/path/to/Models/c3d-pretrained.pth'
+        return '/data/unagi0/kamata/ucf101_model/c3d-pretrained.pth'

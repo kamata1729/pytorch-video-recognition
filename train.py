@@ -14,6 +14,8 @@ from torch.autograd import Variable
 from dataloaders.dataset import VideoDataset
 from network import C3D_model, R2Plus1D_model, R3D_model
 
+from slack_notification import *
+
 # Use GPU if available else revert to CPU
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("Device being used:", device)
@@ -46,7 +48,7 @@ else:
     run_id = int(runs[-1].split('_')[-1]) + 1 if runs else 0
 
 save_dir = os.path.join(save_dir_root, 'run', 'run_' + str(run_id))
-modelName = 'C3D' # Options: C3D or R2Plus1D or R3D
+modelName = 'R3D' # Options: C3D or R2Plus1D or R3D
 saveName = modelName + '-' + dataset
 
 def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=lr,
@@ -58,7 +60,7 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
     """
 
     if modelName == 'C3D':
-        model = C3D_model.C3D(num_classes=num_classes, pretrained=True)
+        model = C3D_model.C3D(num_classes=num_classes, pretrained=False)
         train_params = [{'params': C3D_model.get_1x_lr_params(model), 'lr': lr},
                         {'params': C3D_model.get_10x_lr_params(model), 'lr': lr * 10}]
     elif modelName == 'R2Plus1D':
@@ -91,7 +93,7 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
     criterion.to(device)
 
     log_dir = os.path.join(save_dir, 'models', datetime.now().strftime('%b%d_%H-%M-%S') + '_' + socket.gethostname())
-    writer = SummaryWriter(log_dir=log_dir)
+    
 
     print('Training model on {} dataset...'.format(dataset))
     train_dataloader = DataLoader(VideoDataset(dataset=dataset, split='train',clip_len=16), batch_size=20, shuffle=True, num_workers=4)
@@ -145,15 +147,17 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
 
             epoch_loss = running_loss / trainval_sizes[phase]
             epoch_acc = running_corrects.double() / trainval_sizes[phase]
-
+            writer = SummaryWriter(logdir=log_dir)
             if phase == 'train':
                 writer.add_scalar('data/train_loss_epoch', epoch_loss, epoch)
                 writer.add_scalar('data/train_acc_epoch', epoch_acc, epoch)
             else:
                 writer.add_scalar('data/val_loss_epoch', epoch_loss, epoch)
                 writer.add_scalar('data/val_acc_epoch', epoch_acc, epoch)
-
+            writer.close()
+            
             print("[{}] Epoch: {}/{} Loss: {} Acc: {}".format(phase, epoch+1, nEpochs, epoch_loss, epoch_acc))
+            send_notification(text="[{}] Epoch: {}/{} Loss: {} Acc: {}".format(phase, epoch+1, nEpochs, epoch_loss, epoch_acc))
             stop_time = timeit.default_timer()
             print("Execution time: " + str(stop_time - start_time) + "\n")
 
@@ -188,14 +192,16 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
             epoch_loss = running_loss / test_size
             epoch_acc = running_corrects.double() / test_size
 
+            writer = SummaryWriter(logdir=log_dir)
             writer.add_scalar('data/test_loss_epoch', epoch_loss, epoch)
             writer.add_scalar('data/test_acc_epoch', epoch_acc, epoch)
-
+            writer.close()
+            
             print("[test] Epoch: {}/{} Loss: {} Acc: {}".format(epoch+1, nEpochs, epoch_loss, epoch_acc))
             stop_time = timeit.default_timer()
             print("Execution time: " + str(stop_time - start_time) + "\n")
 
-    writer.close()
+    
 
 
 if __name__ == "__main__":
